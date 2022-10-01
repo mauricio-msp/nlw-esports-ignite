@@ -3,13 +3,14 @@ import cx from 'classnames'
 
 import * as Dialog from '@radix-ui/react-dialog'
 
-import { CreateAdBanner } from './components/CreateAdBanner'
-import { CreateAdDialog } from './components/CreateAdDialog'
-import { GameBanner } from './components/GameBanner'
+import { CreateAdBanner } from '~/components/CreateAdBanner'
+import { CreateAdDialog } from '~/components/CreateAdDialog'
+import { GameBanner } from '~/components/GameBanner'
 
-import logoImage from './assets/logo-nlw-esports.svg'
+import { api } from '~/services/api'
 
-import './styles/main.css'
+import logoImage from '~/assets/logo-nlw-esports.svg'
+import '~/styles/main.css'
 
 interface Game {
   id: string
@@ -24,9 +25,13 @@ function App() {
   const [games, setGames] = useState<Game[]>([])
 
   useEffect(() => {
-    fetch('http://localhost:3333/games')
-      .then(response => response.json())
-      .then(data => setGames(data))
+    const handleGetGames = async () => {
+      const response = await api.get<Game[]>('/games')
+
+      setGames(response.data)
+    }
+
+    handleGetGames()
   }, [])
 
   return (

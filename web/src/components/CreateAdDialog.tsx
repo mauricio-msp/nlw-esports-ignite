@@ -1,55 +1,59 @@
-import { FormEvent, useEffect, useState } from 'react'
-import cx from 'classnames'
+import { useEffect, useState } from 'react'
+import { Controller, useForm } from 'react-hook-form'
+import { GameController } from 'phosphor-react'
 
-import * as Checkbox from '@radix-ui/react-checkbox'
 import * as Dialog from '@radix-ui/react-dialog'
-import * as ToggleGroup from '@radix-ui/react-toggle-group'
 
-import { Check, GameController } from 'phosphor-react'
+import { SelectWeekdays } from '~/components/SelectWeekdays'
 
-import { Input } from './Form/Input'
-import { Tooltip } from './Primitives/Tooltip'
+import { Input } from '~/components/Form/Input'
+import { Select } from '~/components/Form/Select'
+import { Checkbox } from '~/components/Form/Checkbox'
 
-import { weekdays } from '../helpers/weekdays'
+import { api } from '~/services/api'
 
 interface Game {
   id: string
   title: string
 }
 
+interface Ad {
+  game: string
+  name: string
+  yearsPlaying: number
+  discord: string
+  hourStart: string
+  hourEnd: string
+  useVoiceChannel: boolean
+  weekdays: Array<string>
+}
+
 export function CreateAdDialog() {
-  const [games, setGames] = useState<Game[]>([])
-  const [selectedWeekdays, setSelectedWeekdays] = useState<string[]>([])
-  const [useVoiceChannel, setUseVoiceChannel] = useState<boolean>(false)
+  const { control, handleSubmit, reset } = useForm<Ad>()
 
-  const handleCreateAd = (event: FormEvent) => {
-    event.preventDefault()
+  const [games, setGames] = useState<{ value: string; label: string }[]>([])
 
-    const formData = new FormData(event.target as HTMLFormElement)
-    const data = Object.fromEntries(formData)
+  const handleSubmitAd = async (values: Ad) => {
+    console.log('TCL: ~ handleSubmitAd ~ values', values)
 
-    fetch(`http://localhost:3333/games/${data.game}/ads`, {
-      method: 'POST',
-      headers: new Headers({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({
-        name: data.name,
-        yearsPlaying: Number(data.yearsPlaying),
-        discord: data.discord,
-        hourStart: data.hourStart,
-        hourEnd: data.hourEnd,
-        useVoiceChannel,
-        weekdays: selectedWeekdays,
-      }),
+    await api.post(`/games/${values.game}/ads`, {
+      ...values,
+      yearsPlaying: Number(values.yearsPlaying),
     })
-      .then(response => response.json())
-      .then(responseData => console.log(responseData))
-      .catch(error => console.log(error))
   }
 
   useEffect(() => {
-    fetch('http://localhost:3333/games')
-      .then(response => response.json())
-      .then(data => setGames(data))
+    const handleGetGames = async () => {
+      const response = await api.get<Game[]>('/games')
+      const dataFormatted = response.data.map(game => ({
+        label: game.title,
+        value: game.id,
+      }))
+
+      setGames(dataFormatted)
+    }
+
+    handleGetGames()
   }, [])
 
   return (
@@ -61,128 +65,176 @@ export function CreateAdDialog() {
           Publique um anúncio
         </Dialog.Title>
 
-        <form onSubmit={handleCreateAd} className="mt-8 flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <label htmlFor="game" className="font-semibold">
-              Qual o game?
-            </label>
-            <select
-              required
-              id="game"
-              name="game"
-              className="form-select bg-zinc-900 py-3 px-4 rounded text-sm placeholder:text-zinc-500 appearance-none"
-              defaultValue=""
-            >
-              <option disabled value="">
-                Selecione o game que deseja jogar
-              </option>
-              {games.map(game => (
-                <option key={game.id} value={game.id}>
-                  {game.title}
-                </option>
-              ))}
-            </select>
-          </div>
+        <form
+          onSubmit={handleSubmit(handleSubmitAd)}
+          className="mt-8 flex flex-col gap-4"
+        >
+          <Controller
+            name="game"
+            defaultValue=""
+            control={control}
+            rules={{
+              required: 'Campo obrigatório',
+            }}
+            render={({ field, fieldState }) => (
+              <Select
+                title="Qual o game?"
+                placeholder="Selecione o game que deseja jogar"
+                name="game"
+                options={games}
+                error={fieldState.error}
+                onSelect={field.onChange}
+              />
+            )}
+          />
 
           <div className="flex flex-col gap-2">
             <label htmlFor="name">Seu nome (ou nickname)</label>
-            <Input
-              required
-              id="name"
+            <Controller
               name="name"
-              type="text"
-              placeholder="Como te chamam dentro do game?"
+              defaultValue=""
+              control={control}
+              rules={{
+                minLength: {
+                  value: 3,
+                  message: 'Precisa ter no mínimo 3 caracteres.',
+                },
+                required: 'Campo obrigatório',
+              }}
+              render={({ field, fieldState }) => (
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Como te chamam dentro do game?"
+                  error={fieldState.error}
+                  {...field}
+                />
+              )}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-6">
             <div className="flex flex-col gap-2">
               <label htmlFor="yearsPlaying">Joga há quantos anos?</label>
-              <Input
-                required
-                id="yearsPlaying"
-                type="number"
+              <Controller
                 name="yearsPlaying"
-                min={0}
-                placeholder="Tudo bem ser ZERO"
+                defaultValue={0}
+                control={control}
+                rules={{
+                  min: {
+                    value: 0,
+                    message: 'Insira um valor válido',
+                  },
+                  required: 'Campo obrigatório',
+                }}
+                render={({ field, fieldState }) => (
+                  <Input
+                    id="yearsPlaying"
+                    type="number"
+                    placeholder="Tudo bem ser ZERO"
+                    error={fieldState.error}
+                    {...field}
+                  />
+                )}
               />
             </div>
             <div className="flex flex-col gap-2">
               <label htmlFor="discord">Qual seu Discord?</label>
-              <Input
-                required
-                id="discord"
-                type="text"
+
+              <Controller
                 name="discord"
-                placeholder="usuario#0000"
+                defaultValue=""
+                control={control}
+                rules={{
+                  pattern: {
+                    value:
+                      /(https?:\/\/)?(www\.|canary\.|ptb\.)?discord(\.gg|(app)?\.com\/invite|\.me)\/([^ ]+)\/?/gi,
+                    message:
+                      'Precisa informar uma url válida. Ex.: https://discord.gg/46Msp',
+                  },
+                  required: 'Campo obrigatório',
+                }}
+                render={({ field, fieldState }) => (
+                  <Input
+                    id="discord"
+                    type="text"
+                    placeholder="usuario#0000"
+                    error={fieldState.error}
+                    {...field}
+                  />
+                )}
               />
             </div>
           </div>
 
-          <div className="flex gap-6">
+          <div className="grid grid-cols-2 gap-6">
+            <Controller
+              name="weekdays"
+              defaultValue={[]}
+              control={control}
+              rules={{ required: 'Precisa ter no mínimo um dia selecionado.' }}
+              render={({ field, fieldState }) => (
+                <SelectWeekdays
+                  selected={field.value}
+                  onSelect={field.onChange}
+                  error={fieldState.error}
+                />
+              )}
+            />
+
             <div className="flex flex-col gap-2">
-              <label htmlFor="weekdays">Quando costuma jogar?</label>
-
-              <ToggleGroup.Root
-                type="multiple"
-                className="grid grid-cols-4 gap-2"
-                value={selectedWeekdays}
-                onValueChange={setSelectedWeekdays}
-              >
-                {weekdays.map(({ value, title }) => (
-                  <Tooltip key={value} title={title}>
-                    <ToggleGroup.Item
-                      value={value}
-                      className={cx(
-                        'w-8 h-8 rounded',
-                        selectedWeekdays.includes(value)
-                          ? 'bg-violet-500'
-                          : 'bg-zinc-900',
-                      )}
-                    >
-                      {title.charAt(0)}
-                    </ToggleGroup.Item>
-                  </Tooltip>
-                ))}
-              </ToggleGroup.Root>
-            </div>
-
-            <div className="flex flex-col gap-2 flex-1">
               <label htmlFor="hourStart">Qual horário do dia?</label>
               <div className="grid grid-cols-2 gap-1">
-                <Input
-                  required
-                  id="hourStart"
-                  type="time"
+                <Controller
                   name="hourStart"
-                  placeholder="De"
+                  defaultValue=""
+                  control={control}
+                  rules={{ required: 'Campo obrigatório' }}
+                  render={({ field, fieldState }) => (
+                    <Input
+                      id="hourStart"
+                      type="time"
+                      placeholder="De"
+                      error={fieldState.error}
+                      {...field}
+                    />
+                  )}
                 />
-                <Input
-                  required
-                  id="hourEnd"
-                  type="time"
+                <Controller
                   name="hourEnd"
-                  placeholder="Até"
+                  defaultValue=""
+                  control={control}
+                  rules={{ required: 'Campo obrigatório' }}
+                  render={({ field, fieldState }) => (
+                    <Input
+                      id="hourEnd"
+                      type="time"
+                      placeholder="Até"
+                      error={fieldState.error}
+                      {...field}
+                    />
+                  )}
                 />
               </div>
             </div>
           </div>
 
-          <label className="mt-2 flex items-center gap-2 text-sm">
-            <Checkbox.Root
-              checked={useVoiceChannel}
-              onCheckedChange={checked => setUseVoiceChannel(!!checked)}
-              className="w-6 h-6 p-1 rounded bg-zinc-900"
-            >
-              <Checkbox.Indicator>
-                <Check className="w-4 h-4 text-emerald-400" />
-              </Checkbox.Indicator>
-            </Checkbox.Root>
-            Costumo me conectar ao chat de voz
-          </label>
+          <Controller
+            name="useVoiceChannel"
+            defaultValue={false}
+            control={control}
+            render={({ field }) => (
+              <Checkbox
+                label="Costumo me conectar ao chat de voz"
+                checked={field.value}
+                onChecked={field.onChange}
+              />
+            )}
+          />
 
           <footer className="mt-4 flex gap-4 justify-end">
             <Dialog.Close
+              onClick={() => reset({})}
               type="button"
               className="bg-zinc-500 hover:bg-zinc-600 px-5 h-12 rounded-md font-semibold"
             >

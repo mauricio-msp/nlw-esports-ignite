@@ -1,4 +1,9 @@
-export const weekdays = [
+interface WeekdayType {
+  value: string
+  title: string
+}
+
+export const weekdays: WeekdayType[] = [
   {
     value: '0',
     title: 'Domingo',
